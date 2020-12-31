@@ -16,6 +16,8 @@ void StopAllMotors();
 class MotorControl{
 private:
   String name;
+  String openCaption;
+  String closeCaption;
   int openPin;
   int closePin;
   enum state{
@@ -24,8 +26,8 @@ private:
   } state;
   
 public:
-  MotorControl(String name,int openPin, int closePin)
-  :name(name),openPin(openPin),closePin(closePin),state(OPEN){}
+  MotorControl(String name,int openPin, int closePin, String openCaption, String closeCaption)
+  :name(name),openPin(openPin),closePin(closePin),openCaption(openCaption),closeCaption(closeCaption),state(OPEN){}
 
   void setup(){
     pinMode(openPin, OUTPUT);
@@ -37,12 +39,12 @@ public:
   void display(WiFiClient& client){
     client.println("<p>Motor "+name+"</p>");
     if (state==OPEN) {
-      client.println("<p><a href=\"/"+name+"/open\"><button disabled class=\"button button2\">Open</button></a>"
-                     "<a href=\"/"+name+"/close\"><button class=\"button\">Close</button></a>"
+      client.println("<p><a href=\"/"+name+"/open\"><button disabled class=\"button button2\">"+openCaption+"</button></a>"
+                     "<a href=\"/"+name+"/close\"><button class=\"button\">"+closeCaption+"</button></a>"
                      "<a href=\"/"+name+"/action\"><button class=\"button\">Action</button></a></p>");
     } else {
-      client.println("<p><a href=\"/"+name+"/open\"><button class=\"button\">Open</button></a>"
-                     "<a href=\"/"+name+"/close\"><button disabled class=\"button button2\">Close</button></a>"
+      client.println("<p><a href=\"/"+name+"/open\"><button class=\"button\">"+openCaption+"</button></a>"
+                     "<a href=\"/"+name+"/close\"><button disabled class=\"button button2\">"+closeCaption+"</button></a>"
                      "<a href=\"/"+name+"/action\"><button class=\"button\">Action</button></a></p>");
     }   
   }  
@@ -82,7 +84,7 @@ public:
   }
 };
 
-MotorControl motorControls[]={MotorControl("upper_arm",16,5), MotorControl("lower_arm",4,0)};
+MotorControl motorControls[]={MotorControl("shoulder",16,5,"Lift","Lower"), MotorControl("grip",9,4,"Open","Close"), MotorControl("wrist",10,14,"Raise","Lower"), MotorControl("elbow",12,13,"Lift","Lower"), MotorControl("rotate",0,3,"Clockwise","Counter clockwise")};
 const int motorControlsLength=sizeof(motorControls)/sizeof(motorControls[0]);
 
 void StopAllMotors(){
@@ -181,7 +183,7 @@ void loop(){
             client.println("Connection: close");
             client.println();
             
-            if (header.indexOf("GET /2/on") >= 0) {
+/*            if (header.indexOf("GET /2/on") >= 0) {
               Serial.println("GPIO 2 on");
               output2State = "on";
               digitalWrite(output2, HIGH);
@@ -189,7 +191,7 @@ void loop(){
               Serial.println("GPIO 2 off");
               output2State = "off";
               digitalWrite(output2, LOW);
-            }
+            }*/
 
             for(int i=0;i<motorControlsLength;i++){
               motorControls[i].postAction(header);
