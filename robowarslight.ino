@@ -147,15 +147,8 @@ void setup() {
   server.begin();
 }
 
-void displayButton(WiFiClient& client, String name, String& state){
-  // Display current state, and ON/OFF buttons for GPIO <name>  
-  client.println("<p>GPIO " + name + " - State " + state + "</p>");
-  // If the state is off, it displays the ON button       
-  if (state=="off") {
-    client.println("<p><a href=\"/"+name+"/on\"><button class=\"button\">ON</button></a></p>");
-  } else {
-    client.println("<p><a href=\"/"+name+"/off\"><button class=\"button button2\">OFF</button></a></p>");
-  }   
+void displayStopButton(WiFiClient& client){
+  client.println("<p><a href=\"/control/stop\"><button class=\"button\">STOP!</button></a></p>");
 }
 
 void loop(){
@@ -183,15 +176,10 @@ void loop(){
             client.println("Connection: close");
             client.println();
             
-/*            if (header.indexOf("GET /2/on") >= 0) {
-              Serial.println("GPIO 2 on");
-              output2State = "on";
-              digitalWrite(output2, HIGH);
-            } else if (header.indexOf("GET /2/off") >= 0) {
-              Serial.println("GPIO 2 off");
-              output2State = "off";
-              digitalWrite(output2, LOW);
-            }*/
+            if (header.indexOf("GET /control/stop") >= 0) {
+              Serial.println("STOP!");
+              StopAllMotors();
+            }
 
             for(int i=0;i<motorControlsLength;i++){
               motorControls[i].postAction(header);
@@ -212,8 +200,7 @@ void loop(){
             // Web Page Heading
             client.println("<body><h1>ROBOWars light</h1>");
                            
-            // Display current state, and ON/OFF buttons for GPIO 2  
-            displayButton(client, "2", output2State);
+            displayStopButton(client);
 
             for(int i=0;i<motorControlsLength;i++){
               motorControls[i].display(client);
