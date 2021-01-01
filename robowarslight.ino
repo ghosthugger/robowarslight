@@ -8,8 +8,10 @@
 // Load Wi-Fi library
 #include <ESP8266WiFi.h>
 #include <Ticker.h>
+#include <assert.h>
 
 Ticker timeout;
+Ticker sequence;
 
 void StopAllMotors();
 
@@ -29,6 +31,20 @@ public:
   MotorControl(String name,int openPin, int closePin, String openCaption, String closeCaption)
   :name(name),openPin(openPin),closePin(closePin),openCaption(openCaption),closeCaption(closeCaption),state(OPEN){}
 
+  String getName(){
+    return name;
+  }
+
+  void setStateOpen(){
+    Serial.println("Open");
+    state=OPEN;
+  }
+
+  void setStateClose(){
+    Serial.println("Close");
+    state=CLOSE;
+  }
+  
   void setup(){
     pinMode(openPin, OUTPUT);
     pinMode(closePin, OUTPUT);
@@ -37,7 +53,7 @@ public:
   }
 
   void display(WiFiClient& client){
-    client.println("<p>Motor "+name+"</p>");
+    client.println("<p>"+name+"</p>");
     if (state==OPEN) {
       client.println("<p><a href=\"/"+name+"/open\"><button disabled class=\"button button2\">"+openCaption+"</button></a>"
                      "<a href=\"/"+name+"/close\"><button class=\"button\">"+closeCaption+"</button></a>"
@@ -84,14 +100,61 @@ public:
   }
 };
 
-MotorControl motorControls[]={MotorControl("shoulder",16,5,"Lift","Lower"), MotorControl("grip",9,4,"Open","Close"), MotorControl("wrist",10,14,"Raise","Lower"), MotorControl("elbow",12,13,"Lift","Lower"), MotorControl("rotate",0,3,"Clockwise","Counter clockwise")};
+MotorControl motorControls[]={MotorControl("Shoulder",16,5,"Raise","Lower"), MotorControl("Grip",9,4,"Open","Close"), MotorControl("Wrist",10,14,"Raise","Lower"), MotorControl("Elbow",12,13,"Raise","Lower"), MotorControl("Rotate",0,3,"Clockwise","Anticlockwise")};
 const int motorControlsLength=sizeof(motorControls)/sizeof(motorControls[0]);
 
+MotorControl& GetMotorControl(String firstCharInName){
+  for(int i=0;i<motorControlsLength;i++){
+    if(String(motorControls[i].getName()[0])==firstCharInName)
+      return motorControls[i];
+  }  
+  assert(false); 
+}
+
+String sequenceString="SR3EL2RA2RC2";
+int sequencePosition=0;
+
+void NextStepInSequence(){
+    sequence.detach();
+    if(sequencePosition<sequenceString.length()-1){
+      String controlName=String(sequenceString[sequencePosition]);
+      MotorControl& control=GetMotorControl(controlName);
+      sequencePosition++;
+      String dir=String(sequenceString[sequencePosition]);
+      if(dir=="R" || dir=="O" || (dir=="C" && controlName=="R"))
+        control.setStateOpen();
+      else
+        control.setStateClose();
+      control.start();
+      
+      sequencePosition++;
+      String timeString=String(sequenceString[sequencePosition]);
+      unsigned int operationTime=timeString.toInt();
+      sequencePosition++;
+
+      Serial.println("Dance move:"+controlName + " " + dir + " " + timeString);
+      
+      sequence.attach(operationTime, NextStepInSequence);
+    }
+    else{
+      Serial.println("Dance finnished!");      
+      StopAllMotors();
+    }
+    
+}
+
+void StartDance(){
+  StopAllMotors();
+  sequencePosition=0;
+  NextStepInSequence();
+}
+
 void StopAllMotors(){
+  timeout.detach();
+  sequence.detach();
   for(int i=0;i<motorControlsLength;i++){
     motorControls[i].stop();
   }  
-  timeout.detach();
 }
 
 
@@ -151,6 +214,16 @@ void displayStopButton(WiFiClient& client){
   client.println("<p><a href=\"/control/stop\"><button class=\"button\">STOP!</button></a></p>");
 }
 
+void displayDanceButton(WiFiClient& client){
+//  client.println("<p><a href=\"/control/dance\"><button class=\"button\">Dance!</button></a></p>");
+
+  client.println("<form action=\"/control/dance\">"
+    "<label for=\"dancemoves\">Dance moves:</label><br>"
+    "<input type=\"text\" id=\"dancemoves\" name=\"dancemoves\" value=\"\"><br>"
+    "<input type=\"submit\" value=\"Submit\">"
+    "</form>");
+}
+
 void loop(){
   WiFiClient client = server.available();   // Listen for incoming clients
 
@@ -181,6 +254,16 @@ void loop(){
               StopAllMotors();
             }
 
+            if (header.indexOf("GET /control/dance") >= 0) {
+              Serial.println("Dance!");
+              
+              String dancemoves=header.substring(header.indexOf("?dancemoves=")+12);
+              dancemoves=dancemoves.substring(0,dancemoves.indexOf(" "));
+              Serial.println(dancemoves);
+              sequenceString=dancemoves;
+              StartDance();
+            }
+
             for(int i=0;i<motorControlsLength;i++){
               motorControls[i].postAction(header);
             }
@@ -205,6 +288,8 @@ void loop(){
             for(int i=0;i<motorControlsLength;i++){
               motorControls[i].display(client);
             }
+
+            displayDanceButton(client);
 
             client.println("</body></html>");
             
